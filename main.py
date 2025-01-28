@@ -11,6 +11,9 @@ load_dotenv()
 client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
 client = Swarm(client)
 
+# At the top level, add a list to store processing steps
+processing_steps = []
+
 def get_dimensions(image: np.ndarray) -> str:
     """Returns image dimensions in (width, height) format"""
     height, width = image.shape[:2]
@@ -205,8 +208,6 @@ Please provide the function parameters based on the query and documentation."""
             "parameters": ["image"]  # fallback to basic parameter
         }
 
-
-
 def process_image_query(image: np.ndarray, query: str):
     # Get function name from query parser
     response = client.run(
@@ -236,7 +237,30 @@ def process_image_query(image: np.ndarray, query: str):
     
     return function_call
 
-def execute_function_call(image: np.ndarray, function_call_params: dict):
+class ImageProcessor:
+    def __init__(self, initial_image: np.ndarray):
+        self.processing_steps = []
+        self.current_image = initial_image.copy()
+        self.initial_image = initial_image.copy()
+    
+    def add_step(self, function_call_params: dict, processed_image: np.ndarray):
+        """Add a processing step and update current image"""
+        self.processing_steps.append({
+            "function_call": function_call_params,
+            "image_shape": processed_image.shape if processed_image is not None else None
+        })
+        self.current_image = processed_image.copy()
+    
+    def get_current_state(self):
+        """Get current processing state"""
+        return {
+            "steps": self.processing_steps,
+            "current_image": self.current_image,
+            "initial_image_shape": self.initial_image.shape,
+            "current_image_shape": self.current_image.shape
+        }
+
+def execute_function_call(processor: ImageProcessor, function_call_params: dict):
     """
     Dynamically execute the function with given parameters
     """
@@ -254,7 +278,7 @@ def execute_function_call(image: np.ndarray, function_call_params: dict):
         processed_params = []
         for param in function_call_params['parameters']:
             if param == 'image':
-                processed_params.append(image)
+                processed_params.append(processor.current_image)
             else:
                 # Safely evaluate string parameters (tuples, numbers, etc)
                 try:
@@ -264,31 +288,46 @@ def execute_function_call(image: np.ndarray, function_call_params: dict):
         
         # Execute the function with the processed parameters
         processed_image = func(*processed_params)
+        
+        # Add step and update current image
+        processor.add_step(function_call_params, processed_image)
+        
         return processed_image
         
     except Exception as e:
         print(f"Error executing function: {str(e)}")
         return None
 
-# Test with sample image and query
-queries = [
-    # "get dimensions of the image",
-    # "resize image to 100x100",
-    "draw a red circle at position left corner of the image with radius 30",
-    # "add gaussian blur with kernel size 11x11"
-]
-# sample_image = np.zeros((480, 640, 3), dtype=np.uint8)  # 640x480 test image
-sample_image = cv2.imread('../test.png')
-for query in queries:
-    function_call_params = process_image_query(sample_image, query)
-    print("Query:", query)
-    print("Function call params:", function_call_params)
-    
-    processed_image = execute_function_call(sample_image, function_call_params)
-    # print("Result:", processed_image if processed_image is not None else "Failed")
-    #save the processed image
-    cv2.imwrite('processed_image.png', processed_image)
-    print("-" * 50)
+if __name__ == "__main__":
+    # Test with sample image and query
+    queries = [
+        "resize image to 100x100",
+        "draw a red circle at position left corner of the image with radius 30",
+        "add gaussian blur with kernel size 11x11"
+    ]
+
+    sample_image = cv2.imread('../test.png')
+    processor = ImageProcessor(sample_image)
+
+    for query in queries:
+        function_call_params = process_image_query(processor.current_image, query)
+        print("Query:", query)
+        print("Function call params:", function_call_params)
+        
+        processed_image = execute_function_call(processor, function_call_params)
+        if processed_image is not None:
+            cv2.imwrite('processed_image.png', processor.current_image)
+        print("-" * 50)
+
+    # Print all processing steps at the end
+    print("\nProcessing Steps:")
+    state = processor.get_current_state()
+    for i, step in enumerate(state["steps"], 1):
+        print(f"Step {i}:")
+        print("Function:", json.dumps(step["function_call"], indent=2))
+        # print("Image shape after step:", step["image_shape"])
+        print()
+
 
 
 
