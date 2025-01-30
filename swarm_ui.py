@@ -20,6 +20,28 @@ def main():
     # Create a sidebar for processing history
     with st.sidebar:
         st.title("Processing History")
+        
+        # Add Step 0 (Initial Image)
+        if st.session_state.processor is not None:
+            with st.expander("Step 0 (Initial Image)"):
+                st.markdown("**Original Image**")
+                # Show initial image shape
+                st.markdown(f"**Shape:** {st.session_state.processor.initial_image.shape}")
+                # Show thumbnail of initial image
+                st.image(
+                    cv2.cvtColor(st.session_state.processor.initial_image, cv2.COLOR_BGR2RGB),
+                    caption="Initial Image",
+                    width=200
+                )
+                # Add checkout button for initial state
+                if st.button("Reset to Original", key="checkout_0"):
+                    # Reset processor to initial state
+                    initial_image = st.session_state.processor.initial_image.copy()
+                    st.session_state.processor = ImageProcessor(initial_image)
+                    st.rerun()
+                st.divider()
+
+        # Display subsequent processing steps
         if st.session_state.processor and st.session_state.processor.processing_steps:
             for i, step in enumerate(st.session_state.processor.processing_steps, 1):
                 with st.expander(f"Step {i}"):
@@ -50,7 +72,6 @@ def main():
                         # Restore the image state to this step
                         st.session_state.processor.current_image = step['image'].copy()
                         # Truncate the processing steps to this point
-                        print("st.session_state.processor.initial_image.shape: ", st.session_state.processor.initial_image.shape)
                         st.session_state.processor.processing_steps = st.session_state.processor.processing_steps[:i]
                         st.rerun()
                     
