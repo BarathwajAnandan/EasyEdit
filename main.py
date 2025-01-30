@@ -14,7 +14,7 @@ client = OpenAI(
   api_key=os.getenv('GROQ_API_KEY'),
 )
 # MODEL = 'deepseek-r1-distill-llama-70b'
-MODEL = 'llama-3.3-70b-versatile'
+MODEL = 'llama3-70b-8192'
 # MODEL = "Meta-Llama-3.3-70B-Instruct"
 client = Swarm(client)
 
@@ -66,8 +66,9 @@ new_prompt_consructor_agent = Agent(
 
 Given:
 1. A user query describing what they want to do
-2. The function name to be used
-3. The function's documentation
+2. Context of the image and processing history - Like shape of the image, processing steps, etc
+3. The function name to be used
+4. The function's documentation
 
 Examples:
 
@@ -123,6 +124,7 @@ function_constructor_agent = Agent(
 
     Given:
     1. A user query describing what they want to do
+    2. Context of the image and processing history - Like shape of the image, processing steps, etc
     2. The function name to be used
     3. The function's documentation
     
@@ -215,6 +217,7 @@ deepthinking_function_constructor_agent = Agent(
 
     Given:
     1. A user query describing what they want to do
+    2. Context of the image and processing history - Like shape of the image, processing steps, etc
     2. The function name to be used
     3. The function's documentation
     
@@ -326,11 +329,15 @@ def construct_function_call(function_info: dict) -> dict:
     """
     Use function_constructor_agent to determine the exact parameters needed for the function call
     """
+    context = function_info['context']
+    print("CONTEXT: ", context)
+
     response = client.run(
         agent=new_prompt_consructor_agent, #change to deepthinking_function_constructor_agent for deepthinking (WIP)
         messages=[{
             "role": "user",
-            "content": f"""Query: {function_info['query']}
+            "content": f"""Context: {context}
+Query: {function_info['query']}
 Function: {function_info['name']}
 Documentation: {function_info['docstring']}
 
@@ -463,11 +470,11 @@ def process_image_query(image: np.ndarray, query: str, processor: ImageProcessor
         messages=[{
             "role": "user", 
             "content": f"""Context:
-{context}
+            {context}
 
-Query: {query}"""
-        }],
-    )
+            Query: {query}"""
+                    }],
+                )
     response_message = response.messages[-1]["content"]
     if '<think>' in response_message:
         function_name = extract_json_from_string(response_message)["function_name"]
