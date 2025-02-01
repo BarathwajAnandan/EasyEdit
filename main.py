@@ -9,13 +9,14 @@ import re
 load_dotenv()
 
 client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
-client = OpenAI(
-  base_url="https://api.groq.com/openai/v1",
-  api_key=os.getenv('GROQ_API_KEY'),
-)
+# client = OpenAI(
+#   base_url="https://api.groq.com/openai/v1",
+#   api_key=os.getenv('GROQ_API_KEY'),
+# )
 # MODEL = 'deepseek-r1-distill-llama-70b'
-MODEL = 'llama3-70b-8192'
+# MODEL = 'llama3-70b-8192'
 # MODEL = "Meta-Llama-3.3-70B-Instruct"
+MODEL = "DeepSeek-R1-Distill-Llama-70B"
 client = Swarm(client)
 
 # At the top level, add a list to store processing steps
@@ -57,7 +58,7 @@ query_parser_agent = Agent(
     {{"function_name": "cv2.rectangle", "docstring": "Draw a rectangle on an image."}}
     Return only the function name without any additional text or explanation.""",
     model=MODEL,
-    tool_choice="auto"
+    # tool_choice="auto"
 )
 
 new_prompt_consructor_agent = Agent(
@@ -115,9 +116,9 @@ Important Guidelines:
     For functions like cv2.resize or cv2.GaussianBlur, if optional parameters are missing, use default values (e.g., default interpolation in resize is cv2.INTER_LINEAR).
     """,
     model=MODEL,
-    tool_choice="auto"
+    # tool_choice="auto"
 )
-cv2.rectangle
+
 function_constructor_agent = Agent(
     name="Function Constructor Agent",
     instructions="""You are an expert in OpenCV and NumPy function parameter constructor. Your task is to analyze the query, function name, and documentation to return the exact parameters needed to call the function.
@@ -301,7 +302,7 @@ deepthinking_function_constructor_agent = Agent(
     """,
 
     model=MODEL,
-    tool_choice="auto"
+    # tool_choice="auto"
 )
 
 def get_function_info(function_name: str) -> dict:
@@ -346,9 +347,10 @@ Please provide the function parameters based on the query and documentation."""
     )
     
     response_message = response.messages[-1]["content"]
-    if '<think>' in response_message:
-        params = extract_json_from_string(response_message)
-        return params
+    print("constructing function call response... ")
+    # if '<think>' in response_message:
+    #     params = extract_json_from_string(response_message)
+    #     return params
     try:
         # Extract JSON from between <output> tags
         json_str = re.search(r'<output>\s*(.*?)\s*</output>', response_message, re.DOTALL)
@@ -364,6 +366,7 @@ Please provide the function parameters based on the query and documentation."""
     except json.JSONDecodeError:
         print("Warning: Could not parse agent response as JSON:", response_message)
         return {
+            "json_str": json_str,
             "function_name": function_info['name'],
             "parameters": ["image"]  # fallback to basic parameter
         }
@@ -448,10 +451,14 @@ def extract_json_from_string(text: str) -> dict:
         A dictionary representing the extracted JSON object, or None if no valid JSON is found.
     """
     # Use regex to find content between </think> and the next {
-    match = re.search(r'</think>\s*({.*})', text, re.DOTALL)
+
+    if '<think>' in text:
+        match = re.search(r'</think>\s*({.*})', text, re.DOTALL)
+
     if match:
         try:
             return json.loads(match.group(1))
+
         except json.JSONDecodeError:
             print("Warning: Could not parse extracted content as JSON.")
             return None

@@ -73,8 +73,9 @@ def main():
                         st.session_state.processor.current_image = step['image'].copy()
                         # Truncate the processing steps to this point
                         st.session_state.processor.processing_steps = st.session_state.processor.processing_steps[:i]
+                        # Update the metadata history to reflect the truncated steps
+                        st.session_state.processor.metadata["history"] = st.session_state.processor.metadata["history"][:i]
                         st.rerun()
-                    
                     st.divider()
 
     # File upload at the top
