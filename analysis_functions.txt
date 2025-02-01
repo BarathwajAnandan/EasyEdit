@@ -1,0 +1,5 @@
+np.shape
+np.max
+np.min
+np.mean
+cv2.countNonZero

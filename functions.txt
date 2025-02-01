@@ -30,6 +30,3 @@ cv2.drawContours()
 cv2.drawMarker()
 cv2.fillPoly()
 cv2.putText() 
-
-
-np.shape()

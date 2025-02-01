@@ -11,7 +11,10 @@ from agents import (
     query_parser_agent,
     new_prompt_consructor_agent,
     function_constructor_agent,
-    load_function_names
+    load_function_names,
+    load_analysis_functions,
+    analysis_query_agent,
+    result_interpreter_agent,
 )
 
 load_dotenv()
@@ -208,44 +211,144 @@ def extract_json_from_string(text: str) -> dict:
     else:
         print("Warning: Could not find JSON after </think> tag.")
         return None
+
+def analyze_image(image: np.ndarray, function_name: str) -> str:
+    """
+    Analyze image using the specified function and return a human-readable result
+    """
+    try:
+        # Split library and function name
+        lib_name, func_name = function_name.split('.')
+        
+        # Get the appropriate library
+        lib = {'cv2': cv2, 'np': np}[lib_name]
+        
+        # Get the function
+        func = getattr(lib, func_name)
+        
+        # Execute the function
+        result = func(image)
+        
+        # Format the result based on function
+        if function_name == 'np.shape':
+            return f"Image dimensions: {result[1]}x{result[0]} (width x height)"
+        elif function_name in ['np.max', 'np.min']:
+            return f"{func_name.capitalize()} pixel value: {result}"
+        elif function_name == 'np.mean':
+            return f"Average pixel value: {result:.2f}"
+        elif function_name == 'cv2.countNonZero':
+            return f"Number of non-zero pixels: {result}"
+        else:
+            return f"Analysis result: {result}"
+            
+    except Exception as e:
+        return f"Error analyzing image: {str(e)}"
+
+def parse_analysis_response(response: str) -> dict:
+    """Parse the JSON response from analysis_query_agent.
+    
+    Args:
+        response (str): The raw response string containing JSON, either as:
+            - Plain JSON: {"type": "analysis", ...}
+            - Markdown code block: ```json\n{"type": "analysis", ...}```
+            
+    Returns:
+        dict: Parsed JSON object with keys 'type', 'function_name', and 'description'
+    """
+    import json
+    # Remove any leading/trailing whitespace and newlines
+    response = response.strip()
+    
+    # If response is wrapped in backticks, extract just the JSON part
+    if '```' in response:
+        # Split by ``` and take the middle part
+        parts = response.split('```')
+        # Get the part that contains the JSON (usually the second part)
+        json_str = [part for part in parts if '{' in part][0]
+        # If there's a language identifier (like 'json\n'), remove it
+        if 'json\n' in json_str:
+            json_str = json_str.split('\n', 1)[1]
+    else:
+        # Response is plain JSON
+        json_str = response
+    
+    # Remove any remaining whitespace and newlines
+    json_str = json_str.strip()
+    
+    # Parse the cleaned JSON string
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse JSON response: {e}")
+
 def process_image_query(image: np.ndarray, query: str, processor: ImageProcessor = None):
+    """Modified to handle both analysis and editing queries"""
     # Get context from processor if available
     context = ""
     if processor:
         context = processor.get_context_string()
     
-    # Get function name from query parser with context
+    # First, determine if this is an analysis or edit query
     response = client.run(
-        agent=query_parser_agent,
+        agent=analysis_query_agent,
         messages=[{
             "role": "user", 
-            "content": f"""Context:
-            {context}
+            "content": f"Query: {query}\nContext: {context}"
+        }],
+    )
+    query_type = parse_analysis_response(response.messages[-1]["content"])
+    
+    if query_type["type"] == "analysis":
+        # Handle analysis query
+        function_name = query_type["function_name"]
+        assert function_name in load_analysis_functions(), "Function name not found in available functions"
 
-            Query: {query}"""
-                    }],
-                )
-    response_message = response.messages[-1]["content"]
-    if '<think>' in response_message:
-        function_name = extract_json_from_string(response_message)["function_name"]
+        function_info = get_function_info(function_name)
+        function_info['query'] = query
+        function_info['context'] = context
+
+        function_call = construct_function_call(function_info)
+        function_call["type"] = "analysis"
+        return function_call
     else:
-        function_name = json.loads(response_message)["function_name"]
-    print("FUNCTION NAME: ", function_name)
-    assert function_name in load_function_names(), "Function name not found in available functions"
-    
-    # Get function information and documentation
-    function_info = get_function_info(function_name)
-    function_info['query'] = query
-    function_info['context'] = context
-    
-    # Construct function parameters
-    function_call = construct_function_call(function_info)
-    
-    return function_call
-def execute_function_call(processor: ImageProcessor, function_call_params: dict):
+        # Handle edit query (existing logic)
+        function_name = query_type["function_name"]
+        assert function_name in load_function_names(), "Function name not found in available functions"
+        
+        # Get function information and documentation
+        function_info = get_function_info(function_name)
+        function_info['query'] = query
+        function_info['context'] = context
+        
+        # Construct function parameters
+        function_call = construct_function_call(function_info)
+        function_call["type"] = "edit"
+        return function_call
+
+def interpret_analysis_result(query: str, function_name: str, result: any, context: str = "") -> str:
     """
-    Dynamically execute the function with given parameters
+    Use result_interpreter_agent to provide a human-readable interpretation of analysis results
     """
+    response = client.run(
+        agent=result_interpreter_agent,
+        messages=[{
+            "role": "user",
+            "content": f"""
+Query: {query}
+Function: {function_name}
+Result: {result}
+"""
+        }],
+        context_variables={
+            "query": query,
+            "function_name": function_name,
+            "result": result,
+        }
+    )
+    return response.messages[-1]["content"]
+
+def execute_function_call(processor: ImageProcessor, function_call_params: dict, query: str):
+    """Modified to handle both analysis and editing results with interpretation"""
     try:
         # Split library and function name
         lib_name, func_name = function_call_params['function_name'].split('.')
@@ -271,8 +374,26 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict)
                 except:
                     processed_params.append(param)
         
-        # Execute the function with the processed parameters
-        processed_image = func(*processed_params)
+        if function_call_params.get("type") == "analysis":
+            # Execute the function with the processed parameters
+            analysis_result = func(*processed_params)
+            
+            # Get human-friendly interpretation
+            interpretation = interpret_analysis_result(
+                query=query,
+                function_name=function_call_params['function_name'],
+                result=analysis_result,
+                context=processor.get_context_string()
+            )
+            
+            return {
+                'raw_result': analysis_result,
+                'interpretation': interpretation
+            }
+            
+        elif function_call_params.get("type") == "edit":
+            # Execute the function with the processed parameters
+            processed_image = func(*processed_params)
         
         # Add step and update current image
         processor.add_step(function_call_params, processed_image)
@@ -286,7 +407,12 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict)
 if __name__ == "__main__":
 # Test with sample image and query
     queries = [
-        "resize image to 100x100",
+        # "get shape of the image",
+        # "get the average pixel value of the image",
+        # "get the minimum pixel value of the image",
+        # "get the maximum pixel value of the image",
+        # "get the number of non-zero pixels in the image",
+        "get the number of pixels in the image",
         # "draw a red circle at position left corner of the image with radius 30",
         # "add gaussian blur with kernel size 11x11"
     ]
@@ -298,10 +424,11 @@ if __name__ == "__main__":
         function_call_params = process_image_query(processor.current_image, query, processor)
         print("Query:", query)
         print("Function call params:", function_call_params)
-        
-        processed_image = execute_function_call(processor, function_call_params)
-        if processed_image is not None:
-            cv2.imwrite('processed_image.png', processor.current_image)
+        output = execute_function_call(processor, function_call_params, query)
+        if isinstance(output, np.ndarray):
+            cv2.imwrite('processed_image.png', output)
+        else:
+            print("ANALYSIS RESULT:", output)
         print("-" * 50)
 
     # Print all processing steps at the end
@@ -312,9 +439,3 @@ if __name__ == "__main__":
         print("Function:", json.dumps(step["function_call"], indent=2))
         # print("Image shape after step:", step["image_shape"])
         print()
-
-
-
-
-
-    # print(result)  # Output: "Image dimensions: 640x480"

@@ -14,6 +14,14 @@ def load_function_names():
             return f.read().strip()
     except FileNotFoundError:
         return "get_dimensions"  # fallback to default function
+    
+def load_analysis_functions():
+    """Load analysis functions from analysis_functions.txt"""
+    try:
+        with open('analysis_functions.txt', 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "np.shape, np.max, np.min, np.mean, cv2.countNonZero"  # fallback to default functions
 
 # Create query parser agent
 query_parser_agent = Agent(
@@ -153,4 +161,56 @@ function_constructor_agent = Agent(
     - Include default values for required parameters if not specified in query
     - Return parameters in the exact order as specified in the function signature""",
     model=MODEL,
-) 
+)
+
+analysis_query_agent = Agent(
+    name="Analysis Query Agent",
+    instructions=f"""You are an expert in image analysis. Your task is to determine if a query is asking for image analysis or image editing. Answer in JSON format.
+
+Examples:
+1. "what are the dimensions of this image"
+   output: {{
+       "type": "analysis",
+       "function_name": "np.shape",
+       "description": "Get image dimensions"
+   }}
+2. "resize image to 800x600"
+    output: {{
+       "type": "edit",
+       "function_name": "cv2.resize",
+       "description": "Modify image size"
+   }}
+Return ONLY the JSON object and strictly nothing else:
+- type: Either "analysis" or "edit"
+- function_name: The appropriate function to call
+- description: Brief description of what the function does
+Analysis functions available:
+{load_analysis_functions()}
+""",
+
+
+
+    model=MODEL
+)
+
+result_interpreter_agent = Agent(
+    name="Result Interpreter Agent",
+    instructions="""You are an expert in interpreting image analysis results. Your task is to provide clear, human-readable responses and direct answers to the user's query.
+
+Examples:
+
+1. Input:
+   - Query: "what is the width of this image"
+   - Function: np.shape
+   - Result: (480, 640, 3)
+   Output: "The image width is 640 pixels."
+
+
+Guidelines:
+- If there's a need to do math, do it as needed. 
+- Include relevant units (pixels, intensity values, etc.)
+- Consider the original query to provide contextual responses
+
+Return only the human-readable interpretation without any additional formatting or tags.""",
+    model=MODEL
+)

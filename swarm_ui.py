@@ -208,54 +208,49 @@ def main():
     if st.session_state.uploaded_image is not None:
         with st.form(key='query_form', clear_on_submit=False):
             query = st.text_input(
-                "Enter your image processing request:",
-                placeholder="Example: resize image to 100x100",
-                value="resize image to 100x100"  # Added default value
+                "Enter your image processing or analysis request:",
+                placeholder="Example: resize image to 100x100 or what is the width of this image?",
+                value=""
             )
-            # Hidden submit button for Enter key
+            # Submit button
             submit = st.form_submit_button("Submit", type="primary")
-            # Hide the submit button using CSS
-            st.markdown(
-                """
-                <style>
-                    button[kind="primary"] {
-                        display: none;
-                    }
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
             
-        # Visible process button (outside form)
-        process_button = st.button("Process Image", type="primary")
-        
-        # Process if either Enter was pressed or button was clicked
-        if submit or process_button:
-            if query:
-                with st.spinner("Processing..."):
-                    try:
-                        # Process query
-                        function_call_params = process_image_query(
-                            st.session_state.processor.current_image, 
-                            query,
-                            processor=st.session_state.processor
-                        )
+            if submit and query:
+                try:
+                    function_call_params = process_image_query(
+                        st.session_state.processor.current_image,
+                        query,
+                        st.session_state.processor
+                    )
+                    
+                    output = execute_function_call(st.session_state.processor, function_call_params, query)
+                    
+                    # Handle different types of results
+                    if function_call_params.get("type") == "analysis":
+                        # Create containers for analysis results
+                        result_container = st.container()
+                        with result_container:
+                            # Show the interpreted result prominently
+                            st.success(output['interpretation'])
+                            
+                            # Show technical details in an expander
+                            with st.expander("Technical Details"):
+                                st.markdown("**Raw Result:**")
+                                st.code(str(output['raw_result']))
+                                st.markdown("**Function Used:**")
+                                st.code(function_call_params['function_name'])
+                    else:
+                        # For edit operations, rerun to update the UI
+                        st.rerun()
                         
-                        # Execute function
-                        processed_image = execute_function_call(
-                            st.session_state.processor, 
-                            function_call_params
-                        )
+                except Exception as e:
+                    st.error(f"Processing error: {str(e)}")
+            elif submit and not query:
+                st.warning("Please enter a request")
 
-                        if processed_image is not None:
-                            st.success("Processing complete!")
-                            st.rerun()
-                        else:
-                            st.error("Processing failed")
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
-            else:
-                st.warning("Please enter a processing request")
+        # Show a placeholder for analysis results when no query is submitted
+        if 'analysis_result' not in st.session_state and not submit:
+            st.info("Enter an analysis query (e.g., 'what are the dimensions?') or an edit request (e.g., 'resize to 800x600')")
 
 if __name__ == "__main__":
     main() 
