@@ -6,6 +6,14 @@ import cv2
 import numpy as np
 import json
 import re
+import base64
+from agents import (
+    query_parser_agent,
+    new_prompt_consructor_agent,
+    function_constructor_agent,
+    load_function_names
+)
+
 load_dotenv()
 
 client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
@@ -30,280 +38,6 @@ processing_steps = []
 #     functions=[get_dimensions],
 #     model="gpt-4o"
 # )
-
-def load_function_names():
-    """Load function names from functions.txt"""
-    try:
-        with open('functions.txt', 'r') as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return "get_dimensions"  # fallback to default function
-
-# Create query parser agent
-# function_names = load_function_names()
-# print(function_names)
-query_parser_agent = Agent(
-    name="Query Parser Agent",
-    instructions=f"""Analyze user queries about images and return only the apt function name to be executed. 
-    The function name should be one of the following available functions as a json object:
-    {load_function_names()}
-    eg: 
-    get me image dimensions or give me image shape
-   {{"function_name": "get_image_shape", "docstring": "Get the dimensions of an image."}}
-    query: "draw a circle on the image"    
-    {{"function_name": "cv2.circle", "docstring": "Draw a circle on an image."}}
-    query: "add gaussian blur to the image"
-    {{"function_name": "cv2.GaussianBlur", "docstring": "Add Gaussian blur to an image."}}
-    query: "draw a rectangle on the image"
-    {{"function_name": "cv2.rectangle", "docstring": "Draw a rectangle on an image."}}
-    Return only the function name without any additional text or explanation.""",
-    model=MODEL,
-    # tool_choice="auto"
-)
-
-new_prompt_consructor_agent = Agent(
-    name="New Prompt Constructor Agent",
-    instructions="""You are an expert in OpenCV and NumPy function parameter construction. Your task is to analyze the user query, function name, and the function documentation to return the exact parameters needed to call the function.
-
-Given:
-1. A user query describing what they want to do
-2. Context of the image and processing history - Like shape of the image, processing steps, etc
-3. The function name to be used
-4. The function's documentation
-
-Examples:
-
-1. **Query**: "resize this image to 800x600"
-   **Function**: `cv2.resize`
-   **Documentation**: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
-   **Output**:
-   {
-       "function_name": "cv2.resize",
-       "parameters": ["image", "(800, 600)"]
-   }
-2, Query: "get the shape of this image" Function: np.shape Documentation: "Return the shape of an array..."
-Output:
-{
-    "function_name": "np.shape",
-    "parameters": ["image"]
-}
-3. Query: "draw a red circle at position (200,200) with radius 30" Function: cv2.circle Documentation: "circle(img, center, radius, color[, thickness[, lineType[, shift]]]) -> img"
-    Output:
-    {
-        "function_name": "cv2.circle",
-        "parameters": ["image", "(200, 200)", "30", "(0,0,255)", "-1"]
-    }
-4. Query: "apply gaussian blur with kernel size 5x5" Function: cv2.GaussianBlur Documentation: "GaussianBlur(src, ksize, sigmaX[, dst[, sigmaY[, borderType[, hint]]]]) -> dst"
-    Output:
-    {
-        "function_name": "cv2.GaussianBlur",
-        "parameters": ["image", "(5,5)", "0"]
-    }
-5. Query: "rotate this image 45 degrees" Function: cv2.getRotationMatrix2D Documentation: "getRotationMatrix2D(center, angle, scale)" Output:
-{
-    "function_name": "cv2.getRotationMatrix2D",
-    "parameters": ["image", "45", "1"]
-}
-
-Important Guidelines:
-    - Reason about it inside <thinking> tags and then return the json output in <output> tags
-    - Always include 'image' as the first parameter for OpenCV functions that operate on images
-    - Use the documentation to understand required vs optional parameters
-    - Convert user requirements into the correct parameter format
-    - For color values, use BGR format (e.g., (255,0,0) for blue)
-    - Include default values for required parameters if not specified in query
-    - Return parameters in the exact order as specified in the function signature
-    For functions like cv2.resize or cv2.GaussianBlur, if optional parameters are missing, use default values (e.g., default interpolation in resize is cv2.INTER_LINEAR).
-    """,
-    model=MODEL,
-    # tool_choice="auto"
-)
-
-function_constructor_agent = Agent(
-    name="Function Constructor Agent",
-    instructions="""You are an expert in OpenCV and NumPy function parameter constructor. Your task is to analyze the query, function name, and documentation to return the exact parameters needed to call the function.
-
-    Given:
-    1. A user query describing what they want to do
-    2. Context of the image and processing history - Like shape of the image, processing steps, etc
-    2. The function name to be used
-    3. The function's documentation
-    
-    Return a JSON object with:
-    - function_name: The name of the function to call
-    - parameters: An array of parameters in the correct order as needed by the function
-    
-    Examples:
-
-    1. Query: "resize this image to 800x600"
-    Function: cv2.resize
-    Documentation: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
-    Output: {
-        "function_name": "cv2.resize",
-        "parameters": ["image", "(800, 600)"]
-    }
-
-    2. Query: "get the shape of this image"
-    Function: np.shape
-    Documentation: "Return the shape of an array..."
-    Output: {
-        "function_name": "np.shape",
-        "parameters": ["image"]
-    }
-
-    3. Query: "draw a red circle at position (200,200) with radius 30"
-    Function: cv2.circle
-    Documentation: "    circle(img, center, radius, color[, thickness[, lineType[, shift]]]) -> img
-    .   @brief Draws a circle.
-    .
-    .   The function cv::circle draws a simple or filled circle with a given center and radius.
-    .   @param img Image where the circle is drawn.
-    .   @param center Center of the circle.
-    .   @param radius Radius of the circle.
-    .   @param color Circle color.
-    .   @param thickness Thickness of the circle outline, if positive. Negative values, like #FILLED,
-    .   mean that a filled circle is to be drawn.
-    .   @param lineType Type of the circle boundary. See #LineTypes
-    .   @param shift Number of fractional bits in the coordinates of the center and in the radius value."
-    Output: {
-        "function_name": "cv2.circle",
-        "parameters": ["image", "(200, 200)", "30", "(0,0,255)", "-1"]
-    }
-
-    4. Query: "apply gaussian blur with kernel size 5x5"
-    Function: cv2.GaussianBlur
-    Documentation: "    GaussianBlur(src, ksize, sigmaX[, dst[, sigmaY[, borderType[, hint]]]]) -> dst
-    .   @brief Blurs an image using a Gaussian filter.
-    .
-    .   The function convolves the source image with the specified Gaussian kernel. In-place filtering is
-    .   supported.
-    .
-    .   @param src input image; the image can have any number of channels, which are processed
-    .   independently, but the depth should be CV_8U, CV_16U, CV_16S, CV_32F or CV_64F.
-    .   @param dst output image of the same size and type as src.
-    .   @param ksize Gaussian kernel size. ksize.width and ksize.height can differ but they both must be
-    .   positive and odd. Or, they can be zero's and then they are computed from sigma.
-    .   @param sigmaX Gaussian kernel standard deviation in X direction.
-    .   @param sigmaY Gaussian kernel standard deviation in Y direction; if sigmaY is zero, it is set to be
-    .   equal to sigmaX, if both sigmas are zeros, they are computed from ksize.width and ksize.height,
-    .   respectively (see #getGaussianKernel for details); to fully control the result regardless of
-    .   possible future modifications of all this semantics, it is recommended to specify all of ksize,
-    .   sigmaX, and sigmaY.
-    .   @param borderType pixel extrapolation method, see #BorderTypes. #BORDER_WRAP is not supported.
-    .   @param hint Implementation modfication flags. See #AlgorithmHint
-    .
-    .   @sa  sepFilter2D, filter2D, blur, boxFilter, bilateralFilter, medianBlur"
-    Output: {
-        "function_name": "cv2.GaussianBlur",
-        "parameters": ["image", "(5,5)", "0"]
-    }
-
-    Important:
-    - Reason about it inside <thinking> tags and then return the json output in <output> tags
-    - Always include 'image' as the first parameter for OpenCV functions that operate on images
-    - Use the documentation to understand required vs optional parameters
-    - Convert user requirements into the correct parameter format
-    - For color values, use BGR format (e.g., (255,0,0) for blue)
-    - Include default values for required parameters if not specified in query
-    - Return parameters in the exact order as specified in the function signature
-    """,
-
-    model=MODEL,
-    tool_choice="auto"
-)
-
-deepthinking_function_constructor_agent = Agent(
-    name="Function Constructor Agent",
-    instructions="""You are an expert in OpenCV and NumPy function parameter constructor. Your task is to analyze the query, function name, and documentation to return the exact parameters needed to call the function.
-
-    Given:
-    1. A user query describing what they want to do
-    2. Context of the image and processing history - Like shape of the image, processing steps, etc
-    2. The function name to be used
-    3. The function's documentation
-    
-    Return a JSON object with:
-    - function_name: The name of the function to call
-    - parameters: An array of parameters in the correct order as needed by the function
-    
-    Examples:
-
-    1. Query: "resize this image to 800x600"
-    Function: cv2.resize
-    Documentation: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
-    Output: {
-        "function_name": "cv2.resize",
-        "parameters": ["image", "(800, 600)"]
-    }
-
-    2. Query: "get the shape of this image"
-    Function: np.shape
-    Documentation: "Return the shape of an array..."
-    Output: {
-        "function_name": "np.shape",
-        "parameters": ["image"]
-    }
-
-    3. Query: "draw a red circle at position (200,200) with radius 30"
-    Function: cv2.circle
-    Documentation: "    circle(img, center, radius, color[, thickness[, lineType[, shift]]]) -> img
-    .   @brief Draws a circle.
-    .
-    .   The function cv::circle draws a simple or filled circle with a given center and radius.
-    .   @param img Image where the circle is drawn.
-    .   @param center Center of the circle.
-    .   @param radius Radius of the circle.
-    .   @param color Circle color.
-    .   @param thickness Thickness of the circle outline, if positive. Negative values, like #FILLED,
-    .   mean that a filled circle is to be drawn.
-    .   @param lineType Type of the circle boundary. See #LineTypes
-    .   @param shift Number of fractional bits in the coordinates of the center and in the radius value."
-    Output: {
-        "function_name": "cv2.circle",
-        "parameters": ["image", "(200, 200)", "30", "(0,0,255)", "-1"]
-    }
-
-    4. Query: "apply gaussian blur with kernel size 5x5"
-    Function: cv2.GaussianBlur
-    Documentation: "    GaussianBlur(src, ksize, sigmaX[, dst[, sigmaY[, borderType[, hint]]]]) -> dst
-    .   @brief Blurs an image using a Gaussian filter.
-    .
-    .   The function convolves the source image with the specified Gaussian kernel. In-place filtering is
-    .   supported.
-    .
-    .   @param src input image; the image can have any number of channels, which are processed
-    .   independently, but the depth should be CV_8U, CV_16U, CV_16S, CV_32F or CV_64F.
-    .   @param dst output image of the same size and type as src.
-    .   @param ksize Gaussian kernel size. ksize.width and ksize.height can differ but they both must be
-    .   positive and odd. Or, they can be zero's and then they are computed from sigma.
-    .   @param sigmaX Gaussian kernel standard deviation in X direction.
-    .   @param sigmaY Gaussian kernel standard deviation in Y direction; if sigmaY is zero, it is set to be
-    .   equal to sigmaX, if both sigmas are zeros, they are computed from ksize.width and ksize.height,
-    .   respectively (see #getGaussianKernel for details); to fully control the result regardless of
-    .   possible future modifications of all this semantics, it is recommended to specify all of ksize,
-    .   sigmaX, and sigmaY.
-    .   @param borderType pixel extrapolation method, see #BorderTypes. #BORDER_WRAP is not supported.
-    .   @param hint Implementation modfication flags. See #AlgorithmHint
-    .
-    .   @sa  sepFilter2D, filter2D, blur, boxFilter, bilateralFilter, medianBlur"
-    Output: {
-        "function_name": "cv2.GaussianBlur",
-        "parameters": ["image", "(5,5)", "0"]
-    }
-
-    Important:
-    - Return eg:  {{"function_name": "cv2.resize", "parameters": ["image", "(100, 100)"]}} only
-    - Always include 'image' as the first parameter for OpenCV functions that operate on images
-    - Use the documentation to understand required vs optional parameters
-    - Convert user requirements into the correct parameter format
-    - For color values, use BGR format (e.g., (255,0,0) for blue)
-    - Include default values for required parameters if not specified in query
-    - Return parameters in the exact order as specified in the function signature
-    """,
-
-    model=MODEL,
-    # tool_choice="auto"
-)
 
 def get_function_info(function_name: str) -> dict:
     """Get the signature and docstring for a specific OpenCV function"""
@@ -378,11 +112,12 @@ class ImageProcessor:
         self.processing_steps = []
         self.current_image = initial_image.copy()
         self.initial_image = initial_image.copy()
-        # Initialize metadata
+        # Initialize metadata with correct shape format
+        h, w = initial_image.shape[:2]  # Get height and width
         self.metadata = {
-            "initial_shape": initial_image.shape,
-            "current_shape": initial_image.shape,
-            "history": [],  # List of changes in text format
+            "initial_shape": f"(width={w}, height={h})",  # CV2 format (w,h)
+            "current_shape": f"(width={w}, height={h})",
+            "history": [],
             "dtype": str(initial_image.dtype)
         }
     
@@ -394,19 +129,22 @@ class ImageProcessor:
         param_str = ', '.join([p for p in params if p != 'image'])
         change_description = f"Applied {func_name} with parameters: {param_str}"
         
+        # Get shape in CV2 format (width, height)
+        h, w = processed_image.shape[:2]
+        shape_str = f"(width={w}, height={h})"
+        
         # Update metadata
-        self.metadata["current_shape"] = processed_image.shape
+        self.metadata["current_shape"] = shape_str
         self.metadata["history"].append({
             "step": len(self.processing_steps) + 1,
             "operation": change_description,
-            "shape_before": self.current_image.shape,
-            "shape_after": processed_image.shape
+            "shape": shape_str
         })
         
         # Add step to processing history
         self.processing_steps.append({
             "function_call": function_call_params,
-            "image_shape": processed_image.shape if processed_image is not None else None,
+            "image_shape": shape_str,
             "image": processed_image.copy() if processed_image is not None else None
         })
         
@@ -435,11 +173,16 @@ class ImageProcessor:
         for step in self.metadata["history"]:
             context.append(
                 f"Step {step['step']}: {step['operation']}\n"
-                f"  Shape changed from {step['shape_before']} to {step['shape_after']}"
+                f"  Shape changed from {step['shape']}"
             )
         
         return "\n".join(context)
     
+    def initial_image_to_base64(self):
+        """Convert initial image to base64 for HTML display"""
+        _, buffer = cv2.imencode('.png', self.initial_image)
+        return base64.b64encode(buffer).decode('utf-8')
+
 def extract_json_from_string(text: str) -> dict:
     """
     Extracts a JSON object from a string, specifically looking for content after a <think> tag.
@@ -541,11 +284,11 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict)
         return None
 
 if __name__ == "__main__":
-    # Test with sample image and query
+# Test with sample image and query
     queries = [
         "resize image to 100x100",
-        "draw a red circle at position left corner of the image with radius 30",
-        "add gaussian blur with kernel size 11x11"
+        # "draw a red circle at position left corner of the image with radius 30",
+        # "add gaussian blur with kernel size 11x11"
     ]
 
     sample_image = cv2.imread('../test.png')

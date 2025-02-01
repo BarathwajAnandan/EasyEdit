@@ -7,6 +7,17 @@ from main import (
     process_image_query, 
     execute_function_call
 )
+import base64
+import streamlit.components.v1 as components
+
+def img_to_base64(img):
+    """
+    Convert an OpenCV image to a base64 string.
+    """
+    _, buffer = cv2.imencode('.png', img)
+    img_bytes = buffer.tobytes()
+    base64_str = base64.b64encode(img_bytes).decode('utf-8')
+    return base64_str
 
 def main():
     st.title("Easy EdIT")
@@ -99,10 +110,80 @@ def main():
     with col1:
         st.subheader("Input Image")
         if st.session_state.uploaded_image is not None:
-            # Display input image
-            st.image(
-                cv2.cvtColor(st.session_state.processor.initial_image, cv2.COLOR_BGR2RGB),
-            )
+            # Get image dimensions from the processor's initial image
+            h, w = st.session_state.processor.initial_image.shape[:2]  # Height and Width of the image
+            img_base64 = img_to_base64(st.session_state.processor.initial_image)
+            img_id = "clickable-image"
+            coord_id = "coords-display"
+            html_code = f"""
+            <div style="position: relative; display: inline-block;">
+                <img id="{img_id}" src="data:image/png;base64,{img_base64}" 
+                     style="width:100%; cursor: crosshair; border:1px solid #ddd; border-radius:4px;">
+                <div id="{coord_id}" style="
+                    position: absolute;
+                    background: rgba(255,0,0,0.7);
+                    color: white;
+                    padding: 5px 5px;
+                    border-radius: 2px;
+                    display: none;
+                    font-size: 12px;
+                    pointer-events: none;
+                    z-index: 1000;
+                ">
+                    Coordinates: (x, y)
+                </div>
+            </div>
+            <div style="margin-top: 5px; display: flex; align-items: center; gap: 10px;">
+                <label style="color: #555; font-size: 14px;"> Click image to see x and y:</label>
+                <input type="text" id="copyable-coords" readonly 
+                       style="width: 100px;
+                              padding: 3px 8px;
+                              border: 1px solid #ddd;
+                              border-radius: 4px;
+                              font-family: monospace;
+                              color: #444;
+                              background: #f8f9fa;"
+                       value="(x, y)">
+            </div>
+            <script>
+                const img = document.getElementById('{img_id}');
+                const coordsDisplay = document.getElementById('{coord_id}');
+                const copyableInput = document.getElementById('copyable-coords');
+                const maxWidth = {w};
+                const maxHeight = {h};
+
+                img.addEventListener('click', function(event) {{
+                    const rect = img.getBoundingClientRect();
+                    const scaleX = {w} / rect.width;
+                    const scaleY = {h} / rect.height;
+                    
+                    // Calculate coordinates and clamp them to image bounds
+                    let x = Math.round((event.clientX - rect.left) * scaleX);
+                    let y = Math.round((event.clientY - rect.top) * scaleY);
+                    
+                    // Ensure coordinates stay within image bounds
+                    x = Math.max(0, Math.min(x, maxWidth - 1));
+                    y = Math.max(0, Math.min(y, maxHeight - 1));
+
+                    const coordText = '(' + x + ', ' + y + ')';
+                    coordsDisplay.textContent = coordText;
+                    copyableInput.value = coordText;  // Only the coordinates, no label
+                    
+                    // Position the coordinate display
+                    coordsDisplay.style.left = (event.clientX - rect.left + 10) + 'px';
+                    coordsDisplay.style.top = (event.clientY - rect.top - 20) + 'px';
+                    coordsDisplay.style.display = 'block';
+                }});
+
+                // Hide the coordinates when clicking outside the image
+                document.addEventListener('click', function(e) {{
+                    if (!img.contains(e.target)) {{
+                        coordsDisplay.style.display = 'none';
+                    }}
+                }});
+            </script>
+            """
+            components.html(html_code, height=h + 50, scrolling=False)
         else:
             st.info("Upload an image to begin")
 
