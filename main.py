@@ -19,15 +19,15 @@ from agents import (
 
 load_dotenv()
 
-client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
-# client = OpenAI(
-#   base_url="https://api.groq.com/openai/v1",
-#   api_key=os.getenv('GROQ_API_KEY'),
-# )
-# MODEL = 'deepseek-r1-distill-llama-70b'
+# client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
+client = OpenAI(
+  base_url="https://api.groq.com/openai/v1",
+  api_key=os.getenv('GROQ_API_KEY'),
+)
+MODEL = 'deepseek-r1-distill-llama-70b'
 # MODEL = 'llama3-70b-8192'
 # MODEL = "Meta-Llama-3.3-70B-Instruct"
-MODEL = "DeepSeek-R1-Distill-Llama-70B"
+# MODEL = "DeepSeek-R1-Distill-Llama-70B"
 client = Swarm(client)
 
 # At the top level, add a list to store processing steps
@@ -69,7 +69,8 @@ def construct_function_call(function_info: dict) -> dict:
     """
     context = function_info['context']
     print("CONTEXT: ", context)
-
+    print("INSIDE CONSTRUCT FUNCTION CALL")
+    
     response = client.run(
         agent=new_prompt_consructor_agent, #change to deepthinking_function_constructor_agent for deepthinking (WIP)
         messages=[{
@@ -93,6 +94,7 @@ Please provide the function parameters based on the query and documentation."""
         json_str = re.search(r'<output>\s*(.*?)\s*</output>', response_message, re.DOTALL)
         if json_str:
             params = json.loads(json_str.group(1))
+            breakpoint()
             return params
         else:
             print("Warning: Could not find <output> tags in response:", response_message)
@@ -297,7 +299,6 @@ def process_image_query(image: np.ndarray, query: str, processor: ImageProcessor
         }],
     )
     query_type = parse_analysis_response(response.messages[-1]["content"])
-    
     if query_type["type"] == "analysis":
         # Handle analysis query
         function_name = query_type["function_name"]
@@ -351,6 +352,7 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
     """Modified to handle both analysis and editing results with interpretation"""
     try:
         # Split library and function name
+        breakpoint()
         lib_name, func_name = function_call_params['function_name'].split('.')
         
         # Get the appropriate library
@@ -401,7 +403,7 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
         return processed_image
         
     except Exception as e:
-        print(f"Error executing function: {str(e)}")
+        print(f"Error executing function: {str(e)}.Use error message as more details for more detailed query for re-execution")
         return None
 
 if __name__ == "__main__":

@@ -40,6 +40,7 @@ query_parser_agent = Agent(
     {{"function_name": "cv2.rectangle", "docstring": "Draw a rectangle on an image."}}
     Return only the function name without any additional text or explanation.""",
     model=MODEL,
+    tool_choice="auto"
 )
 
 # Create new prompt constructor agent
@@ -48,10 +49,10 @@ new_prompt_consructor_agent = Agent(
     instructions="""You are an expert in OpenCV and NumPy function parameter construction. Your task is to analyze the user query, function name, and the function documentation to return the exact parameters needed to call the function.
 
 Given:
-1. A user query describing what they want to do
-2. Context of the image and processing history - Like shape of the image, processing steps, etc
-3. The function name to be used
-4. The function's documentation
+1. A user query describing what they want to do : {query}
+2. Context of the image and processing history - Like shape of the image, processing steps, etc : {context}
+3. The function name to be used : {function_name}
+4. The function's documentation : {docstring}
 
 Examples:
 
@@ -60,44 +61,23 @@ Examples:
    **Documentation**: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
    **Output**:
    {
-       "function_name": "cv2.resize",
+       "function_name": "cv2.",
        "parameters": ["image", "(800, 600)"]
    }
-2, Query: "get the shape of this image" Function: np.shape Documentation: "Return the shape of an array..."
-Output:
-{
-    "function_name": "np.shape",
-    "parameters": ["image"]
-}
-3. Query: "draw a red circle at position (200,200) with radius 30" Function: cv2.circle Documentation: "circle(img, center, radius, color[, thickness[, lineType[, shift]]]) -> img"
-    Output:
-    {
-        "function_name": "cv2.circle",
-        "parameters": ["image", "(200, 200)", "30", "(0,0,255)", "-1"]
-    }
-4. Query: "apply gaussian blur with kernel size 5x5" Function: cv2.GaussianBlur Documentation: "GaussianBlur(src, ksize, sigmaX[, dst[, sigmaY[, borderType[, hint]]]]) -> dst"
-    Output:
-    {
-        "function_name": "cv2.GaussianBlur",
-        "parameters": ["image", "(5,5)", "0"]
-    }
-5. Query: "rotate this image 45 degrees" Function: cv2.getRotationMatrix2D Documentation: "getRotationMatrix2D(center, angle, scale)" Output:
-{
-    "function_name": "cv2.getRotationMatrix2D",
-    "parameters": ["image", "45", "1"]
-}
+
 
 Important Guidelines:
+    - Make sure you use the correct function name and parameters - dont copy from the examples
     - Reason about it inside <thinking> tags and then return the json output in <output> tags
     - Always include 'image' as the first parameter for OpenCV functions that operate on images
     - Use the documentation to understand required vs optional parameters
     - Convert user requirements into the correct parameter format
     - For color values, use BGR format (e.g., (255,0,0) for blue)
-    - Include default values for required parameters if not specified in query
     - Return parameters in the exact order as specified in the function signature
     For functions like cv2.resize or cv2.GaussianBlur, if optional parameters are missing, use default values (e.g., default interpolation in resize is cv2.INTER_LINEAR).
     """,
     model=MODEL,
+    tool_choice="auto"
 )
 
 # Create function constructor agent
@@ -161,14 +141,22 @@ function_constructor_agent = Agent(
     - Include default values for required parameters if not specified in query
     - Return parameters in the exact order as specified in the function signature""",
     model=MODEL,
+    tool_choice="auto"
 )
 
 analysis_query_agent = Agent(
     name="Analysis Query Agent",
-    instructions=f"""You are an expert in image analysis. Your task is to determine if a query is asking for image analysis or image editing. Answer in JSON format.
+    instructions=f"""You are an expert in query parsing. Your task is to determine if a query is asking for description of image or to edit the image. Answer in JSON format.
+
+    detect always means EDIT.
+
+    keywords for description mode :
+    count, analyze, describe etc
+
 
 Examples:
 1. "what are the dimensions of this image"
+
    output: {{
        "type": "analysis",
        "function_name": "np.shape",
@@ -190,7 +178,8 @@ Analysis functions available:
 
 
 
-    model=MODEL
+    model=MODEL,
+    tool_choice="auto"
 )
 
 result_interpreter_agent = Agent(
@@ -212,5 +201,6 @@ Guidelines:
 - Consider the original query to provide contextual responses
 
 Return only the human-readable interpretation without any additional formatting or tags.""",
-    model=MODEL
+    model=MODEL,
+    tool_choice="auto"
 )
