@@ -1,4 +1,4 @@
-# Easy EdIT
+# Easy EdIT 
 
 **Easy EdIT** is an interactive image processing and analysis platform that lets you edit images using natural language. Built with Python, it combines Streamlit's user interface with OpenCV and NumPy for image manipulation, powered by AI agents that understand your intent and execute the appropriate operations.
 
@@ -101,6 +101,10 @@ Easy EdIT uses a pipeline of specialized AI agents to:
 3. Execute the operations using OpenCV/NumPy
 4. Provide human-friendly feedback
 
+
+### Try out a couple examples here   
+- https://easyedit-bhl5hydyqiozrmfqjy3ict.streamlit.app
+    
 ## Project Structure
 
 ```
