@@ -22,11 +22,138 @@ def img_to_base64(img):
     return base64_str
 
 def main():
-    st.title("Easy EdIT")
+    # Custom CSS for better styling
+    st.markdown("""
+        <style>
+        /* Main title styling */
+        .main-title {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 3.5rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 2rem !important;
+            text-align: center;
+        }
+        
+        /* Card-like containers */
+        .stButton button {
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        }
+        
+        /* File uploader styling */
+        .uploadedFile {
+            border: 2px dashed #4ECDC4 !important;
+            border-radius: 10px !important;
+            padding: 20px !important;
+        }
+        
+        /* Sidebar styling */
+        .css-1d391kg {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Form styling */
+        .stTextInput input {
+            border-radius: 8px !important;
+            border: 2px solid #e9ecef !important;
+            padding: 10px 15px !important;
+        }
+        
+        .stTextInput input:focus {
+            border-color: #4ECDC4 !important;
+            box-shadow: 0 0 0 2px rgba(78,205,196,0.2) !important;
+        }
+        
+        
+        /* Download buttons */
+        .download-btn {
+            background-color: #4ECDC4 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 10px 20px !important;
+            border: none !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .download-btn:hover {
+            background-color: #45b7b0 !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        /* Expander styling */
+        .streamlit-expanderHeader {
+            background-color: #f8f9fa !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Success/Error message styling */
+        .stSuccess, .stError {
+            border-radius: 8px !important;
+        }
+        
+        /* Scrolling text animation */
+        @keyframes scroll-left {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        .scrolling-text-container {
+            width: 100%;
+            overflow: hidden;
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 5%, rgba(255,255,255,1) 95%, rgba(255,255,255,0) 100%);
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+        
+        .scrolling-text {
+            display: inline-block;
+            white-space: nowrap;
+            animation: scroll-left 30s linear infinite;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .command-highlight {
+            color: #4ECDC4;
+            font-weight: 600;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Add reset button at the top with a more descriptive name
-    if st.button("🔄 Reset", type="secondary", help="Clear all images, processing history, and logs"):
-        # Clear all session state
+    # Custom title with gradient
+    st.markdown('<h1 class="main-title">✨ Easy EdIT</h1>', unsafe_allow_html=True)
+
+    # Add scrolling text with example commands
+    st.markdown("""
+        <div class="scrolling-text-container">
+            <div class="scrolling-text">
+                Try: 
+                <span class="command-highlight">"resize image to 300x300"</span> • 
+                <span class="command-highlight">"detect edges"</span> • 
+                <span class="command-highlight">"add gaussian blur of 5x5"</span> • 
+                <span class="command-highlight">"rotate image 90 degrees"</span> • 
+                <span class="command-highlight">"convert to grayscale"</span> • 
+                <span class="command-highlight">"what are the dimensions?"</span> • 
+                <span class="command-highlight">"crop image from (100,100) to (400,400)"</span> • 
+                <span class="command-highlight">"flip image horizontally"</span> • 
+                <span class="command-highlight">"flip image vertically"</span> • 
+                <span class="command-highlight">"count number of pixels"</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Reset button with custom styling
+    if st.button("🔄 Reset Session", 
+                type="secondary", 
+                help="Clear all images, processing history, and logs",
+                key="reset_button"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
@@ -52,7 +179,15 @@ def main():
 
     # Create a sidebar for processing history
     with st.sidebar:
-        st.title("Processing History")
+        st.markdown("""
+            <h2 style='
+                text-align: center;
+                color: #2C3E50;
+                padding: 10px;
+                border-bottom: 2px solid #4ECDC4;
+                margin-bottom: 20px;
+            '>🎨 Processing History</h2>
+        """, unsafe_allow_html=True)
         
         # Add Step 0 (Initial Image)
         if st.session_state.processor is not None:
@@ -111,11 +246,11 @@ def main():
                         st.rerun()
                     st.divider()
 
-    # File upload below reset button
+    # Main content area before file uploader
     uploaded_file = st.file_uploader(
-        "Upload an image",
-        type=['jpg', 'jpeg', 'png'],
-        help="Supported formats: JPG, JPEG, PNG"
+         "📤 Upload your image",
+         type=['jpg', 'jpeg', 'png'],
+         help="Supported formats: JPG, JPEG, PNG"
     )
 
     # Store uploaded image in session state when a new file is uploaded
@@ -218,30 +353,30 @@ def main():
             cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB),
         )
         
-        # Create a row of download buttons
+        # Modify the download buttons section
+        st.markdown('<div style="display: flex; justify-content: center; gap: 20px;">', unsafe_allow_html=True)
         col_png, col_jpg, col_pdf = st.columns(3)
         
-        # PNG Download
         with col_png:
             _, png_buffer = cv2.imencode('.png', st.session_state.processor.current_image)
             st.download_button(
-                label="Download PNG",
+                label="📥 Download PNG",
                 data=png_buffer.tobytes(),
                 file_name="processed_image.png",
-                mime="image/png"
+                mime="image/png",
+                use_container_width=True
             )
         
-        # JPG Download
         with col_jpg:
             _, jpg_buffer = cv2.imencode('.jpg', st.session_state.processor.current_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
             st.download_button(
-                label="Download JPG",
+                label="📥 Download JPG",
                 data=jpg_buffer.tobytes(),
                 file_name="processed_image.jpg",
-                mime="image/jpeg"
+                mime="image/jpeg",
+                use_container_width=True
             )
         
-        # PDF Download
         with col_pdf:
             try:
                 from PIL import Image
@@ -257,26 +392,28 @@ def main():
                 pdf_bytes = pdf_buffer.getvalue()
                 
                 st.download_button(
-                    label="Download PDF",
+                    label="📥 Download PDF",
                     data=pdf_bytes,
                     file_name="processed_image.pdf",
-                    mime="application/pdf"
+                    mime="application/pdf",
+                    use_container_width=True
                 )
             except Exception as e:
                 st.error(f"PDF conversion failed: {str(e)}")
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("Process an image to see the result")
 
-    # Query input and process button below the images
+    # Query form with enhanced styling
     if st.session_state.uploaded_image is not None:
+        st.markdown('<div class="custom-box">', unsafe_allow_html=True)
         with st.form(key='query_form', clear_on_submit=False):
             query = st.text_input(
-                "Enter your image processing or analysis request:",
+                "🔍 What would you like to do with your image?",
                 placeholder="Example: resize image to 100x100 or what is the width of this image?",
                 value=""
             )
-            # Submit button
-            submit = st.form_submit_button("Submit", type="primary")
+            submit = st.form_submit_button("✨ Process Image", type="primary")
             
             if submit and query:
                 try:
@@ -313,10 +450,11 @@ def main():
 
         # Show a placeholder for analysis results when no query is submitted
         if 'analysis_result' not in st.session_state and not submit:
-            st.info("Enter an analysis query (e.g., 'what are the dimensions?') or an edit request (e.g., 'resize to 800x600')")
+            st.info("Enter an analysis query (e.g., 'what are the dimensions?') or an edit request (e.g., 'resize to hxw')")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # At the bottom of the page, show logs in an expander
-    with st.expander("Debug Logs", expanded=False):
+    # Debug logs with enhanced styling
+    with st.expander("🐛 Debug Logs", expanded=False):
         # Create a container for logs
         log_container = st.container()
         

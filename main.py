@@ -9,14 +9,14 @@ import re
 import base64
 from clients import llm, PROVIDER
 from agents import (
-    query_parser_agent,
     new_prompt_consructor_agent,
-    function_constructor_agent,
     load_function_names,    
     load_analysis_functions,
     analysis_query_agent,
     result_interpreter_agent,
 )
+import custom_func as custom
+import streamlit as st
 
 
 client = Swarm(llm)
@@ -42,6 +42,8 @@ def get_function_info(function_name: str) -> dict:
             fn = getattr(np, fn)
         elif lib == 'cv2':
             fn = getattr(cv2, fn)
+        elif lib == 'custom':
+            fn = getattr(custom, fn)
         else:
             raise ValueError(f"Invalid library: {lib}")
         return {
@@ -59,9 +61,7 @@ def construct_function_call(function_info: dict) -> dict:
     Use function_constructor_agent to determine the exact parameters needed for the function call
     """
     context = function_info['context']
-    print("CONTEXT: ", context)
-    print("INSIDE CONSTRUCT FUNCTION CALL")
-    
+    print("QUERY: ", function_info)    
     response = client.run(
         agent=new_prompt_consructor_agent, #change to deepthinking_function_constructor_agent for deepthinking (WIP)
         messages=[{
@@ -76,7 +76,6 @@ Please provide the function parameters based on the query and documentation."""
     )
     
     response_message = response.messages[-1]["content"]
-    print("constructing function call response... ")
     # if '<think>' in response_message:
     #     params = extract_json_from_string(response_message)
     #     return params
@@ -345,7 +344,7 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
         lib_name, func_name = function_call_params['function_name'].split('.')
         
         # Get the appropriate library
-        lib = {'cv2': cv2, 'np': np}[lib_name]
+        lib = {'cv2': cv2, 'np': np, 'custom': custom}[lib_name]
         
         # Get the function from the library
         func = getattr(lib, func_name)
@@ -364,7 +363,7 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
                         processed_params.append(eval(param))
                 except:
                     processed_params.append(param)
-        
+        print("PROCESSED PARAMS: ",lib_name, func_name, processed_params)
         if function_call_params.get("type") == "analysis":
             # Execute the function with the processed parameters
             analysis_result = func(*processed_params)
@@ -430,3 +429,4 @@ if __name__ == "__main__":
         print("Function:", json.dumps(step["function_call"], indent=2))
         # print("Image shape after step:", step["image_shape"])
         print()
+

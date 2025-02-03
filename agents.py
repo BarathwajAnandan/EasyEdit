@@ -52,7 +52,7 @@ query_parser_agent = Agent(
 # Create new prompt constructor agent
 new_prompt_consructor_agent = Agent(
     name="New Prompt Constructor Agent",
-    instructions="""You are an expert in OpenCV and NumPy function parameter construction. Your task is to analyze the user query, function name, and the function documentation to return the exact parameters needed to call the function.
+    instructions="""You are an expert in OpenCV and NumPy, custom function parameter construction. Your task is to analyze the user query, function name, and the function documentation to return the exact parameters needed to call the function.
 
 Given:
 1. A user query describing what they want to do : {query}
@@ -62,25 +62,35 @@ Given:
 
 Examples:
 
-1. **Query**: "resize this image to 800x600"
+1. **Query**: "resize this image to heightxwidth"
    **Function**: `cv2.resize`
    **Documentation**: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
    **Output**:
    {
        "function_name": "cv2.",
-       "parameters": ["image", "(800, 600)"]
+       "parameters": ["image", "(height, width)"]
+   }
+2. **Query**: "crop image from (x1,y1) to (x2,y2)"
+   **Function**: `custom.crop`
+   **Documentation**: "crop(image, x1, y1, x2, y2) -> image"
+   **Output**:
+   {
+       "function_name": "custom.crop",
+       "parameters": ["image", "(x1, y1)", "(x2, y2)"]
    }
 
 
 Important Guidelines:
+    - 'this', 'it' etc refers to the image
     - Make sure you use the correct function name and parameters - dont copy from the examples
     - Reason about it inside <thinking> tags and then return the json output in <output> tags
-    - Always include 'image' as the first parameter for OpenCV functions that operate on images
+    - Always include 'image' as the first parameter for OpenCV and custom functions that operate on images
     - Use the documentation to understand required vs optional parameters
     - Convert user requirements into the correct parameter format
     - For color values, use BGR format (e.g., (255,0,0) for blue)
     - Return parameters in the exact order as specified in the function signature
     For functions like cv2.resize or cv2.GaussianBlur, if optional parameters are missing, use default values (e.g., default interpolation in resize is cv2.INTER_LINEAR).
+    - For custom functions, use the function signature and documentation to return the exact parameters : custom.crop() etc
     """,
     **get_agent_kwargs()
 )
@@ -102,12 +112,12 @@ function_constructor_agent = Agent(
     
     Examples:
 
-    1. Query: "resize this image to 800x600"
+    1. Query: "resize this image to hxw"
     Function: cv2.resize
     Documentation: "resize(src, dsize[, dst[, fx[, fy[, interpolation]]]]) -> dst"
     Output: {
         "function_name": "cv2.resize",
-        "parameters": ["image", "(800, 600)"]
+        "parameters": ["image", "(h, w)"]
     }
 
     2. Query: "get the shape of this image"
@@ -166,11 +176,17 @@ Examples:
        "function_name": "np.shape",
        "description": "Get image dimensions"
    }}
-2. "resize image to 800x600"
+2. "resize image to hxw"
     output: {{
        "type": "edit",
        "function_name": "cv2.resize",
        "description": "Modify image size"
+   }}
+3. "crop image from (x1,y1) to (x2,y2)"
+    output: {{
+       "type": "edit",
+       "function_name": "custom.crop",
+       "description": "Crop image"
    }}
 Return ONLY the JSON object and strictly nothing else:
 - type: Either "analysis" or "edit"
