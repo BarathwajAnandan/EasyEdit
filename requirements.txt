@@ -1,6 +1,6 @@
 # Core dependencies
 streamlit
-opencv-python-headless
+opencv-python
 numpy
 pillow
 # API and environment
