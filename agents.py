@@ -17,7 +17,7 @@ def get_agent_kwargs():
 def load_function_names():
     """Load function names from functions.txt"""
     try:
-        with open('functions.txt', 'r') as f:
+        with open('supported_functions/functions.txt', 'r') as f:
             return f.read().strip()
     except FileNotFoundError:
         return "get_dimensions"  # fallback to default function
@@ -25,7 +25,7 @@ def load_function_names():
 def load_analysis_functions():
     """Load analysis functions from analysis_functions.txt"""
     try:
-        with open('analysis_functions.txt', 'r') as f:
+        with open('supported_functions/analysis_functions.txt', 'r') as f:
             return f.read().strip()
     except FileNotFoundError:
         return "np.shape, np.max, np.min, np.mean, cv2.countNonZero"  # fallback to default functions
