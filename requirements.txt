@@ -1,0 +1,10 @@
+# Core dependencies
+streamlit
+opencv-python
+numpy
+pillow
+
+# API and environment
+python-dotenv
+openai
+swarm
