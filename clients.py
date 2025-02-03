@@ -4,7 +4,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-PROVIDER = "GROQ" # SNOVA, GROQ
+PROVIDER = "SNOVA" # SNOVA, GROQ
 
 
 if PROVIDER == "SNOVA":
