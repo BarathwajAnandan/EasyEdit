@@ -47,6 +47,7 @@
 ✅ Convert image to grayscale   
 ✅ Resize to 700x700  
 
+Still a WIP : Main idea was to make sure you get one liners accurately before going to multiline snippet edits. 🫡
 ## Getting Started
 
 ### Prerequisites
@@ -123,6 +124,7 @@ We welcome contributions! Whether it's adding new features, improving documentat
 - Open an issue
 - Submit a pull request
 - Help test and improve our AI agents
+- Stars are always appreciated ;) 
 
 ## License
 
