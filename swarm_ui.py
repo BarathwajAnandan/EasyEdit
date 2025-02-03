@@ -121,144 +121,146 @@ def main():
             st.session_state.uploaded_image = image
             st.session_state.processor = ImageProcessor(image)
 
-    # Create two columns for input and output images
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Input Image")
-        if st.session_state.uploaded_image is not None:
-            # Get image dimensions from the processor's initial image
-            h, w = st.session_state.processor.initial_image.shape[:2]  # Height and Width of the image
-            img_base64 = img_to_base64(st.session_state.processor.initial_image)
-            img_id = "clickable-image"
-            coord_id = "coords-display"
-            html_code = f"""
-            <div style="position: relative; display: inline-block;">
-                <img id="{img_id}" src="data:image/png;base64,{img_base64}" 
-                     style="width:100%; cursor: crosshair; border:1px solid #ddd; border-radius:4px;">
-                <div id="{coord_id}" style="
-                    position: absolute;
-                    background: rgba(255,0,0,0.7);
-                    color: white;
-                    padding: 5px 5px;
-                    border-radius: 2px;
-                    display: none;
-                    font-size: 12px;
-                    pointer-events: none;
-                    z-index: 1000;
-                ">
-                    Coordinates: (x, y)
-                </div>
+    # Input image section
+    st.subheader("Input Image")
+    if st.session_state.uploaded_image is not None:
+        # Get image dimensions from the processor's initial image
+        h, w = st.session_state.processor.initial_image.shape[:2]
+        img_base64 = img_to_base64(st.session_state.processor.initial_image)
+        img_id = "clickable-image"
+        coord_id = "coords-display"
+        html_code = f"""
+        <div style="position: relative; display: inline-block; margin-bottom: 0;">
+            <img id="{img_id}" src="data:image/png;base64,{img_base64}" 
+                 style="width:100%; cursor: crosshair; border:1px solid #ddd; border-radius:4px; display:block;">
+            <div id="{coord_id}" style="
+                position: absolute;
+                background: rgba(255,0,0,0.7);
+                color: white;
+                padding: 5px 5px;
+                border-radius: 2px;
+                display: none;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 1000;
+            ">
+                Coordinates: (x, y)
             </div>
-            <div style="margin-top: 5px; display: flex; align-items: center; gap: 10px;">
-                <label style="color: #555; font-size: 14px;"> Click image to see x and y:</label>
-                <input type="text" id="copyable-coords" readonly 
-                       style="width: 100px;
-                              padding: 3px 8px;
-                              border: 1px solid #ddd;
-                              border-radius: 4px;
-                              font-family: monospace;
-                              color: #444;
-                              background: #f8f9fa;"
-                       value="(x, y)">
-            </div>
-            <script>
-                const img = document.getElementById('{img_id}');
-                const coordsDisplay = document.getElementById('{coord_id}');
-                const copyableInput = document.getElementById('copyable-coords');
-                const maxWidth = {w};
-                const maxHeight = {h};
+        </div>
+        <div style="margin-top: 5px; margin-bottom: 0; display: flex; align-items: center; gap: 10px;">
+            <label style="color: #555; font-size: 14px;"> Click image to see x and y:</label>
+            <input type="text" id="copyable-coords" readonly 
+                   style="width: 100px;
+                          padding: 3px 8px;
+                          border: 1px solid #ddd;
+                          border-radius: 4px;
+                          font-family: monospace;
+                          color: #444;
+                          background: #f8f9fa;"
+                   value="(x, y)">
+        </div>
+        <script>
+            const img = document.getElementById('{img_id}');
+            const coordsDisplay = document.getElementById('{coord_id}');
+            const copyableInput = document.getElementById('copyable-coords');
+            const maxWidth = {w};
+            const maxHeight = {h};
 
-                img.addEventListener('click', function(event) {{
-                    const rect = img.getBoundingClientRect();
-                    const scaleX = {w} / rect.width;
-                    const scaleY = {h} / rect.height;
-                    
-                    // Calculate coordinates and clamp them to image bounds
-                    let x = Math.round((event.clientX - rect.left) * scaleX);
-                    let y = Math.round((event.clientY - rect.top) * scaleY);
-                    
-                    // Ensure coordinates stay within image bounds
-                    x = Math.max(0, Math.min(x, maxWidth - 1));
-                    y = Math.max(0, Math.min(y, maxHeight - 1));
+            img.addEventListener('click', function(event) {{
+                const rect = img.getBoundingClientRect();
+                const scaleX = {w} / rect.width;
+                const scaleY = {h} / rect.height;
+                
+                // Calculate coordinates and clamp them to image bounds
+                let x = Math.round((event.clientX - rect.left) * scaleX);
+                let y = Math.round((event.clientY - rect.top) * scaleY);
+                
+                // Ensure coordinates stay within image bounds
+                x = Math.max(0, Math.min(x, maxWidth - 1));
+                y = Math.max(0, Math.min(y, maxHeight - 1));
 
-                    const coordText = '(' + x + ', ' + y + ')';
-                    coordsDisplay.textContent = coordText;
-                    copyableInput.value = coordText;  // Only the coordinates, no label
-                    
-                    // Position the coordinate display
-                    coordsDisplay.style.left = (event.clientX - rect.left + 10) + 'px';
-                    coordsDisplay.style.top = (event.clientY - rect.top - 20) + 'px';
-                    coordsDisplay.style.display = 'block';
-                }});
+                const coordText = '(' + x + ', ' + y + ')';
+                coordsDisplay.textContent = coordText;
+                copyableInput.value = coordText;  // Only the coordinates, no label
+                
+                // Position the coordinate display
+                coordsDisplay.style.left = (event.clientX - rect.left + 10) + 'px';
+                coordsDisplay.style.top = (event.clientY - rect.top - 20) + 'px';
+                coordsDisplay.style.display = 'block';
+            }});
 
-                // Hide the coordinates when clicking outside the image
-                document.addEventListener('click', function(e) {{
-                    if (!img.contains(e.target)) {{
-                        coordsDisplay.style.display = 'none';
-                    }}
-                }});
-            </script>
-            """
-            components.html(html_code, height=h + 50, scrolling=False)
-        else:
-            st.info("Upload an image to begin")
+            // Hide the coordinates when clicking outside the image
+            document.addEventListener('click', function(e) {{
+                if (!img.contains(e.target)) {{
+                    coordsDisplay.style.display = 'none';
+                }}
+            }});
+        </script>
+        """
+        # Calculate a more precise height for the component
+        coord_input_height = 500  # Height for the coordinates input area
+        components.html(html_code, height=coord_input_height, scrolling=False)
+    else:
+        st.info("Upload an image to begin")
 
-    with col2:
-        st.subheader("Processed Image")
-        if st.session_state.processor is not None:
-            st.image(
-                cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB),
+    # Add minimal spacing
+    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+
+    # Output image section
+    st.subheader("Processed Image")
+    if st.session_state.processor is not None:
+        st.image(
+            cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB),
+        )
+        
+        # Create a row of download buttons
+        col_png, col_jpg, col_pdf = st.columns(3)
+        
+        # PNG Download
+        with col_png:
+            _, png_buffer = cv2.imencode('.png', st.session_state.processor.current_image)
+            st.download_button(
+                label="Download PNG",
+                data=png_buffer.tobytes(),
+                file_name="processed_image.png",
+                mime="image/png"
             )
-            
-            # Create a row of download buttons
-            col_png, col_jpg, col_pdf = st.columns(3)
-            
-            # PNG Download
-            with col_png:
-                _, png_buffer = cv2.imencode('.png', st.session_state.processor.current_image)
+        
+        # JPG Download
+        with col_jpg:
+            _, jpg_buffer = cv2.imencode('.jpg', st.session_state.processor.current_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
+            st.download_button(
+                label="Download JPG",
+                data=jpg_buffer.tobytes(),
+                file_name="processed_image.jpg",
+                mime="image/jpeg"
+            )
+        
+        # PDF Download
+        with col_pdf:
+            try:
+                from PIL import Image
+                from io import BytesIO
+                
+                # Convert OpenCV image to PIL Image
+                img_rgb = cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB)
+                pil_image = Image.fromarray(img_rgb)
+                
+                # Create PDF in memory
+                pdf_buffer = BytesIO()
+                pil_image.save(pdf_buffer, format='PDF', resolution=100.0)
+                pdf_bytes = pdf_buffer.getvalue()
+                
                 st.download_button(
-                    label="Download PNG",
-                    data=png_buffer.tobytes(),
-                    file_name="processed_image.png",
-                    mime="image/png"
+                    label="Download PDF",
+                    data=pdf_bytes,
+                    file_name="processed_image.pdf",
+                    mime="application/pdf"
                 )
-            
-            # JPG Download
-            with col_jpg:
-                _, jpg_buffer = cv2.imencode('.jpg', st.session_state.processor.current_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
-                st.download_button(
-                    label="Download JPG",
-                    data=jpg_buffer.tobytes(),
-                    file_name="processed_image.jpg",
-                    mime="image/jpeg"
-                )
-            
-            # PDF Download
-            with col_pdf:
-                try:
-                    from PIL import Image
-                    from io import BytesIO
-                    
-                    # Convert OpenCV image to PIL Image
-                    img_rgb = cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB)
-                    pil_image = Image.fromarray(img_rgb)
-                    
-                    # Create PDF in memory
-                    pdf_buffer = BytesIO()
-                    pil_image.save(pdf_buffer, format='PDF', resolution=100.0)
-                    pdf_bytes = pdf_buffer.getvalue()
-                    
-                    st.download_button(
-                        label="Download PDF",
-                        data=pdf_bytes,
-                        file_name="processed_image.pdf",
-                        mime="application/pdf"
-                    )
-                except Exception as e:
-                    st.error(f"PDF conversion failed: {str(e)}")
-        else:
-            st.info("Process an image to see the result")
+            except Exception as e:
+                st.error(f"PDF conversion failed: {str(e)}")
+    else:
+        st.info("Process an image to see the result")
 
     # Query input and process button below the images
     if st.session_state.uploaded_image is not None:
