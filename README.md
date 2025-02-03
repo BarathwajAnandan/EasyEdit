@@ -29,8 +29,24 @@
 - Full list of tested operations in ( Need help to add more operations and test them):
   - `functions.txt` (editing operations)
   - `analysis_functions.txt` (analysis operations)
+- Add custom functions if they don't exist in cv2 - for eg - Crop has no function in cv2.
 
-**Note:** Currently, multi-line code edits, such as Hough Circle detection, are not supported.
+ **Note:** Currently, multi-line code edits, such as Hough Circle detection, "Convert to Grayscale and resize...", "Add blur and draw circles", are not supported. 
+
+### Examples:
+❌  HoughCircle detection   
+❌  Convert to Grayscale and resize   
+❌  Add blur and draw circles  
+❌  Draw circle and rectangle at 0,0  
+❌  Crop the image and resize  
+
+✅ draw rectangle from 100,100 with h,w as 100,200  
+✅ draw circle with radius 10 and at the center of the image  
+✅ Crop image from 0,0 to 100,200  
+✅ Blur the image  
+✅ Convert image to grayscale   
+✅ Resize to 700x700  
+
 ## Getting Started
 
 ### Prerequisites
@@ -63,10 +79,11 @@
    ```
 
    Get your API keys from:
-   - [Groq Console](https://console.groq.com/api-keys)
    - [Sambanova Cloud](https://cloud.sambanova.ai/apis)
+   - [Groq Console](https://console.groq.com/api-keys)
 
-4. **Launch the App**
+
+5. **Launch the App**
 
     Start the app from the project root with:
 
