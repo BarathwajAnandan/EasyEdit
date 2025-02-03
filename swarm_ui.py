@@ -24,13 +24,18 @@ def img_to_base64(img):
 def main():
     st.title("Easy EdIT")
 
+    # Add reset button at the top with a more descriptive name
+    if st.button("🔄 Reset", type="secondary", help="Clear all images, processing history, and logs"):
+        # Clear all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
     # Initialize session state
     if 'processor' not in st.session_state:
         st.session_state.processor = None
     if 'uploaded_image' not in st.session_state:
         st.session_state.uploaded_image = None
-
-    # Initialize session state for logs if not present
     if 'logs' not in st.session_state:
         st.session_state.logs = []
 
@@ -106,7 +111,7 @@ def main():
                         st.rerun()
                     st.divider()
 
-    # File upload at the top
+    # File upload below reset button
     uploaded_file = st.file_uploader(
         "Upload an image",
         type=['jpg', 'jpeg', 'png'],

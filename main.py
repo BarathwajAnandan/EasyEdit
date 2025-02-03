@@ -408,7 +408,7 @@ if __name__ == "__main__":
         # "add gaussian blur with kernel size 11x11"
     ]
 
-    sample_image = cv2.imread('../test.png')
+    sample_image = cv2.imread('test.png')
     processor = ImageProcessor(sample_image)
 
     for query in queries:
