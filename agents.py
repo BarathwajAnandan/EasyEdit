@@ -2,10 +2,17 @@ from swarm import Agent
 import os
 from dotenv import load_dotenv
 
+from clients import llm, PROVIDER, MODEL        
 load_dotenv()
 
-# Load model configuration
-MODEL = "DeepSeek-R1-Distill-Llama-70B"
+def get_agent_kwargs():
+    """Return agent kwargs based on client name"""
+    if PROVIDER == 'GROQ':
+        return {"model": MODEL, "tool_choice": "auto"}
+    elif PROVIDER == 'SNOVA':
+        return {"model": MODEL}
+    else:
+        raise ValueError(f"Unsupported provider: {PROVIDER}")
 
 def load_function_names():
     """Load function names from functions.txt"""
@@ -39,8 +46,7 @@ query_parser_agent = Agent(
     query: "draw a rectangle on the image"
     {{"function_name": "cv2.rectangle", "docstring": "Draw a rectangle on an image."}}
     Return only the function name without any additional text or explanation.""",
-    model=MODEL,
-    tool_choice="auto"
+    **get_agent_kwargs()
 )
 
 # Create new prompt constructor agent
@@ -76,8 +82,7 @@ Important Guidelines:
     - Return parameters in the exact order as specified in the function signature
     For functions like cv2.resize or cv2.GaussianBlur, if optional parameters are missing, use default values (e.g., default interpolation in resize is cv2.INTER_LINEAR).
     """,
-    model=MODEL,
-    tool_choice="auto"
+    **get_agent_kwargs()
 )
 
 # Create function constructor agent
@@ -140,8 +145,7 @@ function_constructor_agent = Agent(
     - For color values, use BGR format (e.g., (255,0,0) for blue)
     - Include default values for required parameters if not specified in query
     - Return parameters in the exact order as specified in the function signature""",
-    model=MODEL,
-    tool_choice="auto"
+    **get_agent_kwargs()
 )
 
 analysis_query_agent = Agent(
@@ -175,11 +179,7 @@ Return ONLY the JSON object and strictly nothing else:
 Analysis functions available:
 {load_analysis_functions()}
 """,
-
-
-
-    model=MODEL,
-    tool_choice="auto"
+    **get_agent_kwargs()
 )
 
 result_interpreter_agent = Agent(
@@ -201,6 +201,5 @@ Guidelines:
 - Consider the original query to provide contextual responses
 
 Return only the human-readable interpretation without any additional formatting or tags.""",
-    model=MODEL,
-    tool_choice="auto"
+    **get_agent_kwargs()
 )

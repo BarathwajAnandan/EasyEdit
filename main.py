@@ -7,28 +7,19 @@ import numpy as np
 import json
 import re
 import base64
+from clients import llm, PROVIDER
 from agents import (
     query_parser_agent,
     new_prompt_consructor_agent,
     function_constructor_agent,
-    load_function_names,
+    load_function_names,    
     load_analysis_functions,
     analysis_query_agent,
     result_interpreter_agent,
 )
 
-load_dotenv()
 
-# client = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=os.getenv("SNOVA_API_KEY"))
-client = OpenAI(
-  base_url="https://api.groq.com/openai/v1",
-  api_key=os.getenv('GROQ_API_KEY'),
-)
-MODEL = 'deepseek-r1-distill-llama-70b'
-# MODEL = 'llama3-70b-8192'
-# MODEL = "Meta-Llama-3.3-70B-Instruct"
-# MODEL = "DeepSeek-R1-Distill-Llama-70B"
-client = Swarm(client)
+client = Swarm(llm)
 
 # At the top level, add a list to store processing steps
 processing_steps = []
@@ -94,7 +85,6 @@ Please provide the function parameters based on the query and documentation."""
         json_str = re.search(r'<output>\s*(.*?)\s*</output>', response_message, re.DOTALL)
         if json_str:
             params = json.loads(json_str.group(1))
-            breakpoint()
             return params
         else:
             print("Warning: Could not find <output> tags in response:", response_message)
@@ -352,7 +342,6 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
     """Modified to handle both analysis and editing results with interpretation"""
     try:
         # Split library and function name
-        breakpoint()
         lib_name, func_name = function_call_params['function_name'].split('.')
         
         # Get the appropriate library

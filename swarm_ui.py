@@ -9,6 +9,8 @@ from main import (
 )
 import base64
 import streamlit.components.v1 as components
+import sys
+from io import StringIO
 
 def img_to_base64(img):
     """
@@ -27,6 +29,21 @@ def main():
         st.session_state.processor = None
     if 'uploaded_image' not in st.session_state:
         st.session_state.uploaded_image = None
+
+    # Initialize session state for logs if not present
+    if 'logs' not in st.session_state:
+        st.session_state.logs = []
+
+    # Create a custom StringIO object to capture prints
+    class StreamCapture(StringIO):
+        def write(self, text):
+            if text.strip():  # Only capture non-empty strings
+                st.session_state.logs.append(text)
+            return super().write(text)
+
+    # Capture stdout
+    sys.stdout = StreamCapture()
+    sys.stderr = StreamCapture()
 
     # Create a sidebar for processing history
     with st.sidebar:
@@ -193,14 +210,53 @@ def main():
             st.image(
                 cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB),
             )
-            # Download button for processed image
-            _, buffer = cv2.imencode('.png', st.session_state.processor.current_image)
-            st.download_button(
-                label="Download Processed Image",
-                data=buffer.tobytes(),
-                file_name="processed_image.png",
-                mime="image/png"
-            )
+            
+            # Create a row of download buttons
+            col_png, col_jpg, col_pdf = st.columns(3)
+            
+            # PNG Download
+            with col_png:
+                _, png_buffer = cv2.imencode('.png', st.session_state.processor.current_image)
+                st.download_button(
+                    label="Download PNG",
+                    data=png_buffer.tobytes(),
+                    file_name="processed_image.png",
+                    mime="image/png"
+                )
+            
+            # JPG Download
+            with col_jpg:
+                _, jpg_buffer = cv2.imencode('.jpg', st.session_state.processor.current_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
+                st.download_button(
+                    label="Download JPG",
+                    data=jpg_buffer.tobytes(),
+                    file_name="processed_image.jpg",
+                    mime="image/jpeg"
+                )
+            
+            # PDF Download
+            with col_pdf:
+                try:
+                    from PIL import Image
+                    from io import BytesIO
+                    
+                    # Convert OpenCV image to PIL Image
+                    img_rgb = cv2.cvtColor(st.session_state.processor.current_image, cv2.COLOR_BGR2RGB)
+                    pil_image = Image.fromarray(img_rgb)
+                    
+                    # Create PDF in memory
+                    pdf_buffer = BytesIO()
+                    pil_image.save(pdf_buffer, format='PDF', resolution=100.0)
+                    pdf_bytes = pdf_buffer.getvalue()
+                    
+                    st.download_button(
+                        label="Download PDF",
+                        data=pdf_bytes,
+                        file_name="processed_image.pdf",
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"PDF conversion failed: {str(e)}")
         else:
             st.info("Process an image to see the result")
 
@@ -252,5 +308,28 @@ def main():
         if 'analysis_result' not in st.session_state and not submit:
             st.info("Enter an analysis query (e.g., 'what are the dimensions?') or an edit request (e.g., 'resize to 800x600')")
 
+    # At the bottom of the page, show logs in an expander
+    with st.expander("Debug Logs", expanded=False):
+        # Create a container for logs
+        log_container = st.container()
+        
+        # Show logs in reverse chronological order (newest first)
+        with log_container:
+            for log in reversed(st.session_state.logs):
+                if "error" in log.lower() or "exception" in log.lower():
+                    st.error(log)
+                else:
+                    st.text(log)
+        
+        # Add a clear logs button
+        if st.button("Clear Logs"):
+            st.session_state.logs = []
+            st.rerun()
+
 if __name__ == "__main__":
-    main() 
+    try:
+        main()
+    finally:
+        # Restore stdout and stderr
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__ 

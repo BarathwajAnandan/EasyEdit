@@ -2,4 +2,7 @@ np.shape
 np.max
 np.min
 np.mean
-cv2.countNonZero
+np.median
+np.std
+np.var
+np.sum
