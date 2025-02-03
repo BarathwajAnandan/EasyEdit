@@ -391,7 +391,7 @@ def execute_function_call(processor: ImageProcessor, function_call_params: dict,
         return processed_image
         
     except Exception as e:
-        print(f"Error executing function: {str(e)}.Use error message as more details for more detailed query for re-execution")
+        print(f"lib_name, func_name, processed_params: {lib_name}, {func_name}, {processed_params[1:]}. Error executing function: {str(e)}. Use error message as more details for more detailed query for re-execution, and rerun!")
         return None
 
 if __name__ == "__main__":
