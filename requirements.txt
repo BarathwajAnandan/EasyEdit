@@ -1,9 +1,8 @@
 # Core dependencies
 streamlit
-opencv-python
+opencv-python-headless
 numpy
 pillow
-
 # API and environment
 python-dotenv
 openai

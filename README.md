@@ -24,7 +24,7 @@
 
 ### Supported Operations
 - Current supports most one line edits. 
-- **Image Editing**: Resize, blur, draw shapes, and more
+- **Image Editing**: Resize, blur, draw shapes, add text, and more
 - **Image Analysis**: Get dimensions, pixel values, and other properties
 - Full list of tested operations in ( Need help to add more operations and test them):
   - `functions.txt` (editing operations)
