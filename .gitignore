@@ -1,2 +1,4 @@
 .env
-.st
+.streamlit/secrets.toml
+__pycache__/
+cv_test.py

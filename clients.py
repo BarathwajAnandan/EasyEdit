@@ -7,7 +7,7 @@ load_dotenv()
 PROVIDER = "SNOVA" # SNOVA, GROQ
 
 import os
-
+print("Available secret keys:", list(st.secrets.keys()))
 if PROVIDER == "SNOVA":
     api_key = os.getenv("SNOVA_API_KEY") or st.secrets["SNOVA_API_KEY"]
     llm = OpenAI(base_url="https://api.sambanova.ai/v1", api_key=api_key)
